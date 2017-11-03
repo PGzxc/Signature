@@ -1,0 +1,128 @@
+// 声明是Android程序
+apply plugin: 'com.android.application'
+// 定义一个打包时间
+static def releaseTime() {
+    return new Date().format("yyyy-MM-dd", TimeZone.getTimeZone("UTC"))
+}
+
+android {
+    // 编译SDK的版本
+    compileSdkVersion 26
+    // build tools的版本
+    buildToolsVersion '26.0.2'
+
+    defaultConfig {
+        // 应用的包名
+        applicationId "com.example.signature"
+        minSdkVersion 14
+        targetSdkVersion 26
+        versionCode 1
+        versionName "1.0"
+        flavorDimensions "versionCode"
+        // dex突破65535的限制
+        multiDexEnabled true
+        // 默认是umeng的渠道
+        manifestPlaceholders = [UMENG_CHANNEL_VALUE: "umeng"]
+
+    }
+
+    // 移除lint检查的error
+    lintOptions {
+        abortOnError false
+    }
+
+    //签名配置
+    signingConfigs {
+        debug {
+            // No debug config
+        }
+        release {
+
+            /**
+             * 第一种签名，直接在gradle中使用明文
+             storePassword "123456"
+             keyAlias "sign"
+             keyPassword "123456"
+             storeFile file('D:/Code/studioDemo/Signature/sign.jks')
+             */
+
+            /**
+             * 第二种，把签名，密码别名写在signing.properties文件中，properties不会被上传
+             */
+            File propFile = file('../signing.properties')
+            if (propFile.exists()) {
+                Properties props = new Properties()
+                props.load(new FileInputStream(propFile))
+                if (props.containsKey('STORE_FILE') && props.containsKey('STORE_PASSWORD') &&
+                        props.containsKey('KEY_ALIAS') && props.containsKey('KEY_PASSWORD')) {
+                    storeFile = file(props['STORE_FILE'])
+                    storePassword = props['STORE_PASSWORD']
+                    keyAlias = props['KEY_ALIAS']
+                    keyPassword = props['KEY_PASSWORD']
+                }
+            } else {
+                android.buildTypes.release.signingConfig = null
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // buildConfigField 自定义配置默认值
+            buildConfigField "boolean", "LOG_DEBUG", "true"
+            buildConfigField "String", "API_HOST", "\"http://api.test.com\""//API Hos
+            versionNameSuffix "-debug"
+            minifyEnabled false
+            //是否zip对齐
+            zipAlignEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.debug
+        }
+
+        release {
+            // buildConfigField 自定义配置默认值
+            buildConfigField "boolean", "LOG_DEBUG", "false"
+            buildConfigField "String", "API_HOST", "\"http://api.release.com\""//API Host
+            //// 是否进行混淆
+            minifyEnabled true
+            zipAlignEnabled true
+            // 移除无用的resource文件
+            shrinkResources true
+            //混淆规则文件
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+
+            android.applicationVariants.all { variant ->
+                variant.outputs.all {
+                    outputFileName = "${variant.name}-${variant.versionName}-${releaseTime()}.apk"
+                }
+            }
+
+        }
+    }
+
+    // 友盟多渠道打包
+    productFlavors {
+        wandoujia {}
+        _360 {}
+        baidu {}
+        xiaomi {}
+        tencent {}
+        taobao {}
+    }
+
+    productFlavors.all { flavor ->
+        flavor.manifestPlaceholders = [UMENG_CHANNEL_VALUE: name]
+    }
+}
+
+dependencies {
+    // 编译libs目录下的所有jar包
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'com.android.support:appcompat-v7:26.1.0'
+    implementation 'com.android.support.constraint:constraint-layout:1.0.2'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'com.android.support.test:runner:1.0.1'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
+}
